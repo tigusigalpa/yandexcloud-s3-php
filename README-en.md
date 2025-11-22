@@ -13,12 +13,14 @@ Full-featured PHP SDK for integration with [Yandex Cloud Object Storage](https:/
 - ✅ **S3-compatible API** - full support for object and bucket operations
 - ✅ **AWS SDK for PHP** - uses the proven AWS SDK v3
 - ✅ **Laravel 8-12 Support** - built-in integration with Service Provider and Facade
-- ✅ **Bucket Management** - create, delete, list buckets
+- ✅ **Bucket Management** - create, delete, list buckets via S3 and REST API
 - ✅ **Object Operations** - upload, download, delete, copy objects
 - ✅ **Presigned URLs** - generate signed URLs for direct access
 - ✅ **IAM Tokens** - automatic token management and refresh
 - ✅ **OAuth Integration** - get IAM tokens via OAuth
-- ✅ **Access Management** - support for IAM roles and permissions
+- ✅ **Access Management** - support for IAM roles and bucket permissions
+- ✅ **REST API for Buckets** - full bucket management via Yandex Cloud REST API
+- ✅ **Role Management** - assign and remove roles for buckets
 
 ## Installation
 
@@ -55,6 +57,7 @@ Add variables to `.env`:
 ```env
 YANDEX_CLOUD_OAUTH_TOKEN=your_oauth_token_here
 YANDEX_CLOUD_BUCKET=your-bucket-name
+YANDEX_CLOUD_FOLDER_ID=your-folder-id
 YANDEX_CLOUD_ENDPOINT=https://storage.yandexcloud.net
 ```
 
@@ -198,6 +201,139 @@ $s3->deleteBucket('bucket-to-delete');
 $s3->deleteBucket();
 ```
 
+## REST API Bucket Management
+
+For advanced bucket management use `BucketManagementClient`:
+
+### In Laravel via Facade:
+
+```php
+use Tigusigalpa\YandexCloudS3\Laravel\Facades\YandexBucketManagement;
+
+// Create bucket via REST API
+$bucket = YandexBucketManagement::createBucket('new-bucket', [
+    'defaultStorageClass' => 'STANDARD',
+]);
+
+// Get bucket information
+$bucket = YandexBucketManagement::getBucket('my-bucket');
+echo $bucket->name;
+echo $bucket->folderId;
+echo $bucket->createdAt;
+
+// List buckets in folder
+$buckets = YandexBucketManagement::listBuckets();
+foreach ($buckets as $bucket) {
+    echo $bucket->name;
+}
+
+// Update bucket
+$bucket = YandexBucketManagement::updateBucket('my-bucket', [
+    'maxSize' => 1073741824, // 1GB
+]);
+
+// Delete bucket
+YandexBucketManagement::deleteBucket('old-bucket');
+```
+
+### Without Laravel:
+
+```php
+use Tigusigalpa\YandexCloudS3\BucketManagementClient;
+
+$bucketClient = new BucketManagementClient(
+    oauthToken: 'your_oauth_token',
+    folderId: 'your_folder_id'
+);
+
+$bucket = $bucketClient->createBucket('new-bucket');
+```
+
+## Bucket Role and Access Management
+
+### Assigning Roles:
+
+```php
+use Tigusigalpa\YandexCloudS3\Laravel\Facades\YandexBucketManagement;
+
+// Add role to user
+YandexBucketManagement::addRoleToBucket(
+    bucketName: 'my-bucket',
+    subjectId: 'user-account-id',
+    roleId: 'storage.editor', // or 'storage.viewer', 'storage.admin'
+    subjectType: 'userAccount' // or 'serviceAccount'
+);
+
+// Remove role
+YandexBucketManagement::removeRoleFromBucket(
+    bucketName: 'my-bucket',
+    subjectId: 'user-account-id',
+    roleId: 'storage.editor'
+);
+
+// List bucket roles
+$bindings = YandexBucketManagement::listAccessBindings('my-bucket');
+foreach ($bindings as $binding) {
+    echo $binding['roleId'];
+    echo $binding['subject']['id'];
+}
+```
+
+### Advanced Role Management:
+
+```php
+// Set roles (overwrites all existing)
+YandexBucketManagement::setAccessBindings('my-bucket', [
+    [
+        'roleId' => 'storage.editor',
+        'subject' => [
+            'id' => 'user-id-1',
+            'type' => 'userAccount'
+        ]
+    ],
+    [
+        'roleId' => 'storage.viewer',
+        'subject' => [
+            'id' => 'user-id-2',
+            'type' => 'userAccount'
+        ]
+    ]
+]);
+
+// Update roles (add/remove)
+YandexBucketManagement::updateAccessBindings('my-bucket', [
+    [
+        'action' => 'ADD',
+        'accessBinding' => [
+            'roleId' => 'storage.admin',
+            'subject' => [
+                'id' => 'user-id-3',
+                'type' => 'userAccount'
+            ]
+        ]
+    ],
+    [
+        'action' => 'REMOVE',
+        'accessBinding' => [
+            'roleId' => 'storage.viewer',
+            'subject' => [
+                'id' => 'user-id-2',
+                'type' => 'userAccount'
+            ]
+        ]
+    ]
+]);
+```
+
+### Available Object Storage Roles:
+
+- `storage.admin` - full bucket access
+- `storage.editor` - read and write objects
+- `storage.viewer` - read-only access
+- `storage.uploader` - upload objects only
+- `storage.configViewer` - view configuration
+- `storage.configurer` - manage configuration
+
 ## Access Management and IAM
 
 ```php
@@ -208,7 +344,7 @@ $oauthManager = $authManager->getOAuthTokenManager();
 
 // Get user information
 $user = $oauthManager->getUserByLogin('username');
-echo $user['id']; // Subject ID
+echo $user['id']; // Subject ID for use in roles
 
 // Get clouds
 $clouds = $oauthManager->listClouds();
@@ -290,6 +426,9 @@ return [
     
     // Default bucket
     'bucket' => env('YANDEX_CLOUD_BUCKET'),
+    
+    // Folder ID for REST API bucket management
+    'folder_id' => env('YANDEX_CLOUD_FOLDER_ID'),
     
     // Endpoint
     'endpoint' => env('YANDEX_CLOUD_ENDPOINT', 'https://storage.yandexcloud.net'),

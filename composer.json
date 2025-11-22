@@ -53,7 +53,8 @@
                 "Tigusigalpa\\YandexCloudS3\\Laravel\\YandexCloudS3ServiceProvider"
             ],
             "aliases": {
-                "YandexS3": "Tigusigalpa\\YandexCloudS3\\Laravel\\Facades\\YandexS3"
+                "YandexS3": "Tigusigalpa\\YandexCloudS3\\Laravel\\Facades\\YandexS3",
+                "YandexBucketManagement": "Tigusigalpa\\YandexCloudS3\\Laravel\\Facades\\YandexBucketManagement"
             }
         }
     },

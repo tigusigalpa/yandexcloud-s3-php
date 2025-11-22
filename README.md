@@ -13,12 +13,14 @@ English version: [README-en.md](README-en.md)
 - ✅ **S3-совместимый API** - полная поддержка операций с объектами и бакетами
 - ✅ **AWS SDK для PHP** - использует проверенную AWS SDK v3
 - ✅ **Поддержка Laravel 8-12** - встроенная интеграция с Service Provider и Facade
-- ✅ **Управление бакетами** - создание, удаление, листинг
+- ✅ **Управление бакетами** - создание, удаление, листинг через S3 и REST API
 - ✅ **Операции с объектами** - загрузка, скачивание, удаление, копирование
 - ✅ **Presigned URLs** - генерация подписанных URL для прямого доступа
 - ✅ **IAM Токены** - автоматическое управление и обновление токенов
 - ✅ **OAuth интеграция** - получение IAM токенов через OAuth
-- ✅ **Управление доступом** - поддержка IAM ролей и прав доступа
+- ✅ **Управление доступом** - поддержка IAM ролей и прав доступа к бакетам
+- ✅ **REST API бакетов** - полное управление бакетами через Yandex Cloud REST API
+- ✅ **Управление ролями** - назначение и удаление ролей для бакетов
 
 ## Установка
 
@@ -55,6 +57,7 @@ php artisan vendor:publish --tag=yandexcloud-s3-config
 ```env
 YANDEX_CLOUD_OAUTH_TOKEN=your_oauth_token_here
 YANDEX_CLOUD_BUCKET=your-bucket-name
+YANDEX_CLOUD_FOLDER_ID=your-folder-id
 YANDEX_CLOUD_ENDPOINT=https://storage.yandexcloud.net
 ```
 
@@ -198,6 +201,139 @@ $s3->deleteBucket('bucket-to-delete');
 $s3->deleteBucket();
 ```
 
+## REST API управление бакетами
+
+Для расширенного управления бакетами используйте `BucketManagementClient`:
+
+### В Laravel через Facade:
+
+```php
+use Tigusigalpa\YandexCloudS3\Laravel\Facades\YandexBucketManagement;
+
+// Создать бакет через REST API
+$bucket = YandexBucketManagement::createBucket('new-bucket', [
+    'defaultStorageClass' => 'STANDARD',
+]);
+
+// Получить информацию о бакете
+$bucket = YandexBucketManagement::getBucket('my-bucket');
+echo $bucket->name;
+echo $bucket->folderId;
+echo $bucket->createdAt;
+
+// Список бакетов в папке
+$buckets = YandexBucketManagement::listBuckets();
+foreach ($buckets as $bucket) {
+    echo $bucket->name;
+}
+
+// Обновить бакет
+$bucket = YandexBucketManagement::updateBucket('my-bucket', [
+    'maxSize' => 1073741824, // 1GB
+]);
+
+// Удалить бакет
+YandexBucketManagement::deleteBucket('old-bucket');
+```
+
+### Без Laravel:
+
+```php
+use Tigusigalpa\YandexCloudS3\BucketManagementClient;
+
+$bucketClient = new BucketManagementClient(
+    oauthToken: 'your_oauth_token',
+    folderId: 'your_folder_id'
+);
+
+$bucket = $bucketClient->createBucket('new-bucket');
+```
+
+## Управление ролями и доступом к бакетам
+
+### Назначение ролей:
+
+```php
+use Tigusigalpa\YandexCloudS3\Laravel\Facades\YandexBucketManagement;
+
+// Добавить роль пользователю
+YandexBucketManagement::addRoleToBucket(
+    bucketName: 'my-bucket',
+    subjectId: 'user-account-id',
+    roleId: 'storage.editor', // или 'storage.viewer', 'storage.admin'
+    subjectType: 'userAccount' // или 'serviceAccount'
+);
+
+// Удалить роль
+YandexBucketManagement::removeRoleFromBucket(
+    bucketName: 'my-bucket',
+    subjectId: 'user-account-id',
+    roleId: 'storage.editor'
+);
+
+// Получить список ролей бакета
+$bindings = YandexBucketManagement::listAccessBindings('my-bucket');
+foreach ($bindings as $binding) {
+    echo $binding['roleId'];
+    echo $binding['subject']['id'];
+}
+```
+
+### Расширенное управление ролями:
+
+```php
+// Установить роли (перезаписывает все существующие)
+YandexBucketManagement::setAccessBindings('my-bucket', [
+    [
+        'roleId' => 'storage.editor',
+        'subject' => [
+            'id' => 'user-id-1',
+            'type' => 'userAccount'
+        ]
+    ],
+    [
+        'roleId' => 'storage.viewer',
+        'subject' => [
+            'id' => 'user-id-2',
+            'type' => 'userAccount'
+        ]
+    ]
+]);
+
+// Обновить роли (добавить/удалить)
+YandexBucketManagement::updateAccessBindings('my-bucket', [
+    [
+        'action' => 'ADD',
+        'accessBinding' => [
+            'roleId' => 'storage.admin',
+            'subject' => [
+                'id' => 'user-id-3',
+                'type' => 'userAccount'
+            ]
+        ]
+    ],
+    [
+        'action' => 'REMOVE',
+        'accessBinding' => [
+            'roleId' => 'storage.viewer',
+            'subject' => [
+                'id' => 'user-id-2',
+                'type' => 'userAccount'
+            ]
+        ]
+    ]
+]);
+```
+
+### Доступные роли для Object Storage:
+
+- `storage.admin` - полный доступ к бакету
+- `storage.editor` - чтение и запись объектов
+- `storage.viewer` - только чтение объектов
+- `storage.uploader` - только загрузка объектов
+- `storage.configViewer` - просмотр конфигурации
+- `storage.configurer` - управление конфигурацией
+
 ## Управление доступом и IAM
 
 ```php
@@ -208,7 +344,7 @@ $oauthManager = $authManager->getOAuthTokenManager();
 
 // Получить информацию о пользователе
 $user = $oauthManager->getUserByLogin('username');
-echo $user['id']; // Subject ID
+echo $user['id']; // Subject ID для использования в ролях
 
 // Получить информацию об облаке
 $clouds = $oauthManager->listClouds();
@@ -290,6 +426,9 @@ return [
     
     // Бакет по умолчанию
     'bucket' => env('YANDEX_CLOUD_BUCKET'),
+    
+    // Folder ID для REST API управления бакетами
+    'folder_id' => env('YANDEX_CLOUD_FOLDER_ID'),
     
     // Endpoint (по умолчанию storage.yandexcloud.net)
     'endpoint' => env('YANDEX_CLOUD_ENDPOINT', 'https://storage.yandexcloud.net'),
