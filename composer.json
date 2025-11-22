@@ -1,0 +1,65 @@
+{
+    "name": "tigusigalpa/yandexcloud-s3-php",
+    "description": "PHP SDK для интеграции с Yandex Cloud Object Storage (S3-совместимый API) с поддержкой Laravel 8-12",
+    "type": "library",
+    "keywords": [
+        "yandex",
+        "yandex-cloud",
+        "s3",
+        "object-storage",
+        "laravel",
+        "php",
+        "sdk",
+        "api",
+        "aws-sdk",
+        "s3-compatible"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Igor Sazonov",
+            "email": "sovletig@gmail.com"
+        }
+    ],
+    "homepage": "https://github.com/tigusigalpa/yandexcloud-s3-php",
+    "support": {
+        "issues": "https://github.com/tigusigalpa/yandexcloud-s3-php/issues",
+        "source": "https://github.com/tigusigalpa/yandexcloud-s3-php"
+    },
+    "require": {
+        "php": "^8.0",
+        "guzzlehttp/guzzle": "^7.0",
+        "illuminate/support": "^8.0|^9.0|^10.0|^11.0|^12.0",
+        "aws/aws-sdk-php": "^3.200"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.0|^10.0",
+        "orchestra/testbench": "^6.0|^7.0|^8.0|^9.0",
+        "mockery/mockery": "^1.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "Tigusigalpa\\YandexCloudS3\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tigusigalpa\\YandexCloudS3\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Tigusigalpa\\YandexCloudS3\\Laravel\\YandexCloudS3ServiceProvider"
+            ],
+            "aliases": {
+                "YandexS3": "Tigusigalpa\\YandexCloudS3\\Laravel\\Facades\\YandexS3"
+            }
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true
+    }
+}
